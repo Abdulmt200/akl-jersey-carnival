@@ -1,4 +1,12 @@
 .env
+.env.*
+!.env.example
+
+node_modules/
+dist/
+.cache/
+
+.DS_Store.env
 *.env
 *.key
 secrets/

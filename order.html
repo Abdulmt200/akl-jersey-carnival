@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Place Your Order | AKL Jersey Carnival Order</title>
+<meta name="theme-color" content="#0B0B0D">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="order-page">
+
+<header class="site-header">
+  <div class="nav container">
+    <a class="brand" href="index.html"><b>AKL</b> JERSEY CARNIVAL ORDER</a>
+    <a class="btn btn-ghost btn-sm" href="index.html">&larr; Home</a>
+  </div>
+</header>
+
+<main class="container order-wrap">
+  <h1 class="page-title">Place Your Order</h1>
+  <div class="info-strip">
+    <span><b data-cfg="PRICE"></b> per jersey</span>
+    <span>Delivery: <span data-cfg="DELIVERY_DATE"></span></span>
+    <span class="free" data-cfg="DELIVERY_TEXT"></span>
+  </div>
+  <div class="closed-note" id="closedNote" hidden>Orders are now closed. Please contact the business on WhatsApp.</div>
+
+  <section class="panel" aria-labelledby="s1">
+    <h2 id="s1"><span class="num">1</span> Choose a jersey</h2>
+
+    <div class="field">
+      <span class="lbl">Category</span>
+      <div class="seg" id="catSeg" role="group" aria-label="Category">
+        <button type="button" data-v="club" aria-pressed="true">Football Club</button>
+        <button type="button" data-v="country" aria-pressed="false">National Team</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <span class="lbl" id="teamLbl">Club</span>
+      <div class="team-grid" id="teamGrid" role="group" aria-labelledby="teamLbl"></div>
+    </div>
+
+    <div class="field" id="otherWrap" hidden>
+      <label class="lbl" for="otherName" id="otherLbl">Club name</label>
+      <input class="input" id="otherName" maxlength="60" autocomplete="off" placeholder="Type the name">
+      <p class="err" id="otherErr" role="alert"></p>
+    </div>
+
+    <div class="field">
+      <span class="lbl">Version</span>
+      <div class="seg" id="verSeg" role="group" aria-label="Jersey version">
+        <button type="button" data-v="Home" aria-pressed="true">Home</button>
+        <button type="button" data-v="Away" aria-pressed="false">Away</button>
+        <button type="button" data-v="Third" aria-pressed="false">Third</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <span class="lbl">Size</span>
+      <div class="chips" id="sizeRow" role="group" aria-label="Size"></div>
+    </div>
+
+    <div class="field">
+      <span class="lbl">Quantity</span>
+      <div class="qty">
+        <button type="button" id="qMinus" aria-label="Decrease quantity">&minus;</button>
+        <output id="qVal" aria-live="polite">1</output>
+        <button type="button" id="qPlus" aria-label="Increase quantity">+</button>
+      </div>
+    </div>
+
+    <p class="err" id="addErr" role="alert"></p>
+    <p class="ok" id="addOk" role="status"></p>
+    <button type="button" class="btn btn-lime btn-block" id="addBtn">Add to order</button>
+  </section>
+
+  <section class="panel" aria-labelledby="s2">
+    <h2 id="s2"><span class="num">2</span> Your order</h2>
+    <p class="empty" id="cartEmpty">No jerseys yet. Choose a jersey above and tap "Add to order".</p>
+    <div id="cart"></div>
+    <div class="totals" id="cartTotals" hidden>
+      <div class="sum-row"><span>Total jerseys</span><b id="cQty">0</b></div>
+      <div class="sum-row"><span>Delivery</span><b data-cfg="DELIVERY_TEXT"></b></div>
+      <div class="sum-row"><span>Total</span><span class="sum-total" id="cTotal"></span></div>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="s3">
+    <h2 id="s3"><span class="num">3</span> Your details</h2>
+    <div class="field">
+      <label class="lbl" for="fName">Full name</label>
+      <input class="input" id="fName" maxlength="80" autocomplete="name" placeholder="e.g. Aminu Musa">
+      <p class="err" id="eName" role="alert"></p>
+    </div>
+    <div class="field">
+      <label class="lbl" for="fPhone">Phone number</label>
+      <input class="input" id="fPhone" type="tel" inputmode="tel" maxlength="16" autocomplete="tel" placeholder="e.g. 08012345678">
+      <p class="err" id="ePhone" role="alert"></p>
+    </div>
+    <div class="field">
+      <label class="lbl" for="fEmail">Email (optional)</label>
+      <input class="input" id="fEmail" type="email" inputmode="email" maxlength="120" autocomplete="email" placeholder="you@example.com">
+      <p class="err" id="eEmail" role="alert"></p>
+    </div>
+    <div class="field">
+      <label class="lbl" for="fNotes">Order notes (optional)</label>
+      <textarea class="input" id="fNotes" maxlength="300" placeholder="Anything we should know?"></textarea>
+      <p class="err" id="eNotes" role="alert"></p>
+    </div>
+  </section>
+
+  <section class="panel" id="reviewPanel" aria-labelledby="s4">
+    <h2 id="s4"><span class="num">4</span> Review and confirm</h2>
+    <div id="summary"></div>
+    <label class="check"><input type="checkbox" id="confirm"><span>I confirm that my details and jersey choices are correct.</span></label>
+    <button type="button" class="btn btn-lime btn-block btn-lg" id="submitBtn" disabled>CONFIRM ORDER</button>
+    <p class="notice" id="submitMsg" role="status" hidden></p>
+  </section>
+</main>
+
+<div class="total-bar">
+  <div class="tb-text"><small id="tbQty">0 jerseys</small><strong id="tbTotal"></strong></div>
+  <a class="btn btn-lime" href="#reviewPanel">Review order</a>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/common.js"></script>
+<script src="js/order.js"></script>
+<script src="js/submit.js"></script>
+</body>
+</html>

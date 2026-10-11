@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin | AKL Jersey Carnival Order</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#0B0B0D">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="admin-page">
+<noscript><p style="padding:20px">Please enable JavaScript to use the admin dashboard.</p></noscript>
+
+<section class="login-wrap" id="loginView" hidden>
+  <div class="login-card">
+    <a class="brand" href="index.html"><b>AKL</b> JERSEY CARNIVAL</a>
+    <h1>Admin login</h1>
+    <form id="loginForm" novalidate>
+      <div class="field">
+        <label class="lbl" for="lemail">Email</label>
+        <input class="input" id="lemail" type="email" inputmode="email" autocomplete="username">
+      </div>
+      <div class="field">
+        <label class="lbl" for="lpass">Password</label>
+        <input class="input" id="lpass" type="password" autocomplete="current-password">
+      </div>
+      <p class="err" id="loginErr" role="alert"></p>
+      <button class="btn btn-lime btn-block" id="loginBtn" type="submit">Sign in</button>
+    </form>
+    <p class="muted small" style="margin-top:14px"><a href="index.html">&larr; Back to website</a></p>
+  </div>
+</section>
+
+<div class="app" id="appView" hidden>
+  <header class="admin-head">
+    <div class="container admin-bar">
+      <div>
+        <a class="brand" href="index.html"><b>AKL</b> ADMIN</a>
+        <div class="who" id="who"></div>
+      </div>
+      <div class="admin-actions">
+        <button class="btn btn-ghost btn-sm" id="btnRefresh" type="button">Refresh</button>
+        <button class="btn btn-ghost btn-sm" id="btnCsv" type="button">Export CSV</button>
+        <button class="btn btn-ghost btn-sm" id="btnReport" type="button">Report</button>
+        <button class="btn btn-outline btn-sm" id="btnOut" type="button">Sign out</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container admin-main">
+    <div class="cards" id="cards"></div>
+
+    <section class="panel">
+      <h2>Orders</h2>
+      <div class="filters">
+        <div class="span2"><label class="sr-only" for="fSearch">Search</label>
+          <input class="input" id="fSearch" type="search" placeholder="Search order no., name or phone" autocomplete="off"></div>
+        <div><label class="sr-only" for="fPay">Payment status</label>
+          <select class="input" id="fPay"><option value="">All payments</option><option>Pending</option><option>Part-paid</option><option>Paid</option></select></div>
+        <div><label class="sr-only" for="fDel">Delivery status</label>
+          <select class="input" id="fDel"><option value="">All deliveries</option><option>Pending</option><option>Ready</option><option>Delivered</option></select></div>
+        <div><label class="sr-only" for="fStatus">Order status</label>
+          <select class="input" id="fStatus"><option value="">All orders</option><option>Pending</option><option>Confirmed</option><option>Cancelled</option></select></div>
+        <div class="span2"><label class="sr-only" for="fTeam">Club or country</label>
+          <select class="input" id="fTeam"><option value="">All clubs and countries</option></select></div>
+      </div>
+      <div class="filter-foot">
+        <span class="muted small" id="count"></span>
+        <button class="btn btn-ghost btn-sm" id="fClear" type="button">Clear filters</button>
+      </div>
+    </section>
+
+    <div class="state" id="state" hidden>
+      <span id="stateText"></span>
+      <button class="btn btn-outline btn-sm" id="retry" type="button" hidden>Try again</button>
+    </div>
+    <div class="state" id="empty" hidden>No orders match your search.</div>
+
+    <div class="table-wrap" id="tableWrap">
+      <table class="tbl">
+        <thead><tr>
+          <th>Order No.</th><th>Customer</th><th>Phone</th><th>Date</th><th>Jerseys</th><th>Qty</th>
+          <th>Total</th><th>Paid</th><th>Balance</th><th>Payment</th><th>Delivery</th><th>Status</th><th></th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div class="pager">
+      <button class="btn btn-ghost btn-sm" id="prev" type="button">&larr; Prev</button>
+      <span class="muted small" id="pageInfo"></span>
+      <button class="btn btn-ghost btn-sm" id="next" type="button">Next &rarr;</button>
+    </div>
+
+    <section class="panel" style="margin-top:22px">
+      <h2>Demand</h2>
+      <p class="muted small" style="margin-bottom:12px">Jerseys ordered, cancelled orders excluded.</p>
+      <div id="insights"></div>
+    </section>
+  </main>
+</div>
+
+<dialog class="detail" id="detail" aria-labelledby="dTitle">
+  <div class="detail-head">
+    <h2 id="dTitle"></h2>
+    <button class="icon-btn" id="dClose" type="button" aria-label="Close">&#10005;</button>
+  </div>
+  <div id="detailBody"></div>
+</dialog>
+
+<div id="reportView" hidden>
+  <div class="report-bar no-print">
+    <button class="btn btn-lime btn-sm" id="rPrint" type="button">Print / Save as PDF</button>
+    <button class="btn btn-ghost btn-sm" id="rClose" type="button" style="color:#111;border-color:#999">Close</button>
+  </div>
+  <div class="report" id="reportBody"></div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/common.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>
