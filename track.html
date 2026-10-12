@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Track Your Order | AKL Jersey Carnival Order</title>
+<meta name="theme-color" content="#0B0B0D">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="order-page">
+
+<header class="site-header">
+  <div class="nav container">
+    <a class="brand" href="index.html"><b>AKL</b> JERSEY CARNIVAL ORDER</a>
+    <div class="admin-actions">
+      <a class="btn btn-lime btn-sm" href="order.html">Order</a>
+      <a class="btn btn-ghost btn-sm" href="index.html">&larr; Home</a>
+    </div>
+  </div>
+</header>
+
+<main class="container order-wrap">
+  <h1 class="page-title">Track Your Order</h1>
+  <p class="muted" style="margin:10px 0 18px">Enter your order number and the phone number you used when you ordered.</p>
+
+  <section class="panel">
+    <div class="field">
+      <label class="lbl" for="tOrder">Order number</label>
+      <input class="input" id="tOrder" maxlength="14" autocomplete="off" autocapitalize="characters" placeholder="e.g. AKL-01001">
+    </div>
+    <div class="field">
+      <label class="lbl" for="tPhone">Phone number</label>
+      <input class="input" id="tPhone" type="tel" inputmode="tel" maxlength="16" autocomplete="tel" placeholder="e.g. 08012345678">
+    </div>
+    <p class="err" id="tErr" role="alert"></p>
+    <button class="btn btn-lime btn-block" id="tBtn" type="button">CHECK ORDER STATUS</button>
+  </section>
+
+  <div id="result" aria-live="polite"></div>
+</main>
+
+<script src="js/config.js"></script>
+<script src="js/common.js"></script>
+<script src="js/track.js"></script>
+</body>
+</html>

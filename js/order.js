@@ -2,7 +2,8 @@
   "use strict";
   var A = window.AKL, C = A.C;
   var PRICE = Number(C.PRICE_PER_JERSEY) || 6000;
-  var MAX_QTY = 50;
+  var FEE = Number(C.DELIVERY_FEE) || 0;
+  var MAX_QTY = 50, MAX_LINES = 20;
   var VERSIONS = ["Home", "Away", "Third"];
   var SIZES = ["M", "L", "XL", "2XL", "3XL"];
   var OTHER = { club: "Other Club", country: "Other Country" };
@@ -10,139 +11,149 @@
     club: ["Real Madrid", "Barcelona", "Manchester United", "Manchester City", "Arsenal", "Chelsea", "Liverpool", "Paris Saint-Germain", "Bayern Munich", "Juventus", "Inter Milan", "AC Milan", "Tottenham Hotspur", OTHER.club],
     country: ["Nigeria", "Argentina", "Brazil", "Portugal", "France", "England", "Spain", "Germany", "USA", OTHER.country]
   };
-  var state = { cat: "club", team: "", ver: "Home", size: "", qty: 1, items: [] };
+  var OTHER_RE = /^[\p{L}\p{N}][\p{L}\p{N}\s&.'\u2019-]{1,59}$/u;
+  var lines = [], uid = 0;
 
   function $(id) { return document.getElementById(id); }
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
-  function lower(s) { return String(s).toLowerCase(); }
 
-  // ---------- Saved cart (jerseys only, never personal details) ----------
-  function saveCart() { try { sessionStorage.setItem("akl_cart", JSON.stringify(state.items)); } catch (e) {} }
-  function loadCart() {
+  // ---------- Jersey lines ----------
+  function newLine(cat, team) { return { id: ++uid, cat: cat || "club", team: team || "", other: "", ver: "Home", size: "", qty: 1, show: false }; }
+  function teamName(l) { return l.team === OTHER[l.cat] ? l.other.trim().replace(/\s+/g, " ") : l.team; }
+  function lineError(l) {
+    var kind = l.cat === "club" ? "club" : "national team";
+    if (!l.team) return "Choose a " + kind + ".";
+    if (l.team === OTHER[l.cat] && !OTHER_RE.test(teamName(l))) return "Type the " + (l.cat === "club" ? "club" : "country") + " name (2 to 60 letters or numbers).";
+    if (!l.size) return "Choose a size.";
+    if (!(l.qty >= 1 && l.qty <= MAX_QTY)) return "Quantity must be 1 to " + MAX_QTY + ".";
+    return "";
+  }
+  function complete(l) { return lineError(l) === ""; }
+  function totals() {
+    var q = 0; lines.forEach(function (l) { if (complete(l)) q += l.qty; });
+    return { qty: q, amount: q > 0 ? q * PRICE + FEE : 0 };
+  }
+  function mergedItems(onlyComplete) {
+    var map = {}, out = [];
+    lines.forEach(function (l) {
+      if (onlyComplete && !complete(l)) return;
+      var name = teamName(l), key = l.cat + "|" + name.toLowerCase() + "|" + l.ver + "|" + l.size;
+      if (map[key]) map[key].qty += l.qty;
+      else { map[key] = { cat: l.cat, name: name, ver: l.ver, size: l.size, qty: l.qty }; out.push(map[key]); }
+    });
+    return out;
+  }
+
+  // Keep the chosen jerseys if the page is refreshed (never personal details)
+  function save() {
     try {
-      var raw = JSON.parse(sessionStorage.getItem("akl_cart") || "[]");
+      sessionStorage.setItem("akl_lines", JSON.stringify(lines.map(function (l) { return { cat: l.cat, team: l.team, other: l.other, ver: l.ver, size: l.size, qty: l.qty }; })));
+    } catch (e) {}
+  }
+  function load() {
+    try {
+      var raw = JSON.parse(sessionStorage.getItem("akl_lines") || "[]");
       if (!Array.isArray(raw)) return [];
-      return raw.filter(function (i) {
-        return i && (i.cat === "club" || i.cat === "country") && typeof i.name === "string" && i.name.length >= 2 && i.name.length <= 60 &&
-          VERSIONS.indexOf(i.ver) !== -1 && SIZES.indexOf(i.size) !== -1 && Number.isInteger(i.qty) && i.qty >= 1 && i.qty <= MAX_QTY;
-      }).map(function (i) { return { id: String(Math.random()), cat: i.cat, name: i.name, ver: i.ver, size: i.size, qty: i.qty }; });
+      return raw.slice(0, MAX_LINES).filter(function (r) {
+        return r && (r.cat === "club" || r.cat === "country") && typeof r.team === "string" && (r.team === "" || LISTS[r.cat].indexOf(r.team) !== -1) &&
+          typeof r.other === "string" && r.other.length <= 60 && VERSIONS.indexOf(r.ver) !== -1 && (r.size === "" || SIZES.indexOf(r.size) !== -1) &&
+          Number.isInteger(r.qty) && r.qty >= 1 && r.qty <= MAX_QTY;
+      }).map(function (r) { var l = newLine(r.cat, r.team); l.other = r.other; l.ver = r.ver; l.size = r.size; l.qty = r.qty; return l; });
     } catch (e) { return []; }
   }
 
-  // ---------- Selection UI ----------
-  function isOther() { return state.team === OTHER[state.cat]; }
-
-  function syncSeg(id, value) {
-    $(id).querySelectorAll("button").forEach(function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-v") === value ? "true" : "false"); });
-  }
-  function renderTeams() {
-    var grid = $("teamGrid");
-    grid.textContent = "";
-    LISTS[state.cat].forEach(function (name) {
-      var b = el("button", "team-opt", name);
-      b.type = "button";
-      b.setAttribute("aria-pressed", state.team === name ? "true" : "false");
-      b.addEventListener("click", function () { state.team = name; renderTeams(); refreshOther(); $("addErr").textContent = ""; });
-      grid.appendChild(b);
-    });
-    $("teamLbl").textContent = state.cat === "club" ? "Club" : "National team";
-  }
-  function refreshOther() {
-    $("otherWrap").hidden = !isOther();
-    $("otherLbl").textContent = state.cat === "club" ? "Club name" : "Country name";
-    $("otherName").placeholder = state.cat === "club" ? "Type the club name" : "Type the country name";
-    if (isOther()) $("otherName").focus({ preventScroll: true });
-  }
-  function renderSizes() {
-    var row = $("sizeRow");
-    row.textContent = "";
-    SIZES.forEach(function (s) {
-      var b = el("button", "size-chip", s);
-      b.type = "button";
-      b.setAttribute("aria-pressed", state.size === s ? "true" : "false");
-      b.addEventListener("click", function () { state.size = s; renderSizes(); $("addErr").textContent = ""; });
-      row.appendChild(b);
-    });
-  }
-  function refreshAddBtn() { $("addBtn").textContent = "Add to order \u00B7 " + A.naira(state.qty * PRICE); }
-
-  $("catSeg").addEventListener("click", function (e) {
-    var b = e.target.closest("button"); if (!b) return;
-    state.cat = b.getAttribute("data-v"); state.team = ""; $("otherName").value = ""; $("otherErr").textContent = "";
-    syncSeg("catSeg", state.cat); renderTeams(); refreshOther();
-  });
-  $("verSeg").addEventListener("click", function (e) {
-    var b = e.target.closest("button"); if (!b) return;
-    state.ver = b.getAttribute("data-v"); syncSeg("verSeg", state.ver);
-  });
-  $("qMinus").addEventListener("click", function () { state.qty = Math.max(1, state.qty - 1); $("qVal").textContent = state.qty; refreshAddBtn(); });
-  $("qPlus").addEventListener("click", function () { state.qty = Math.min(MAX_QTY, state.qty + 1); $("qVal").textContent = state.qty; refreshAddBtn(); });
-
-  // ---------- Add to order ----------
-  var OTHER_RE = /^[\p{L}\p{N}][\p{L}\p{N}\s&.'\u2019-]{1,59}$/u;
-  function addItem() {
-    $("addErr").textContent = ""; $("addOk").textContent = ""; $("otherErr").textContent = "";
-    if (A.isClosed()) { $("addErr").textContent = "Orders are closed."; return; }
-    if (!state.team) { $("addErr").textContent = "Please choose a " + (state.cat === "club" ? "club" : "national team") + "."; return; }
-    var name = state.team;
-    if (isOther()) {
-      name = $("otherName").value.trim().replace(/\s+/g, " ");
-      if (!OTHER_RE.test(name)) { $("otherErr").textContent = "Enter a valid name (2 to 60 letters or numbers)."; $("otherName").setAttribute("aria-invalid", "true"); $("otherName").focus(); return; }
-      $("otherName").removeAttribute("aria-invalid");
+  function buildLine(l, idx) {
+    var box = el("div", "line");
+    var head = el("div", "line-head");
+    head.appendChild(el("b", null, "Jersey " + (idx + 1)));
+    if (lines.length > 1) {
+      var rm = el("button", "link-btn", "Remove"); rm.type = "button"; rm.setAttribute("aria-label", "Remove jersey " + (idx + 1));
+      rm.addEventListener("click", function () { lines = lines.filter(function (x) { return x !== l; }); renderLines(); refreshAll(); });
+      head.appendChild(rm);
     }
-    if (!state.size) { $("addErr").textContent = "Please choose a size."; return; }
+    box.appendChild(head);
 
-    var existing = state.items.filter(function (i) { return i.cat === state.cat && lower(i.name) === lower(name) && i.ver === state.ver && i.size === state.size; })[0];
-    if (existing) { existing.qty = Math.min(MAX_QTY, existing.qty + state.qty); }
-    else { state.items.push({ id: String(Math.random()), cat: state.cat, name: name, ver: state.ver, size: state.size, qty: state.qty }); }
-
-    state.qty = 1; $("qVal").textContent = 1; refreshAddBtn();
-    $("addOk").textContent = "Added to your order.";
-    setTimeout(function () { $("addOk").textContent = ""; }, 2500);
-    renderAll();
-  }
-  $("addBtn").addEventListener("click", addItem);
-
-  // ---------- Cart ----------
-  function totals() {
-    var q = state.items.reduce(function (s, i) { return s + i.qty; }, 0);
-    return { qty: q, amount: q * PRICE };
-  }
-  function renderCart() {
-    var box = $("cart");
-    box.textContent = "";
-    state.items.forEach(function (it) {
-      var row = el("div", "cart-item");
-      var main = el("div");
-      main.appendChild(el("div", "ci-title", it.name));
-      main.appendChild(el("div", "ci-sub", (it.cat === "club" ? "Club" : "National team") + " \u00B7 " + it.ver + " \u00B7 Size " + it.size + " \u00B7 " + A.naira(PRICE) + " each"));
-      row.appendChild(main);
-      row.appendChild(el("div", "ci-price", A.naira(it.qty * PRICE)));
-
-      var actions = el("div", "ci-actions");
-      var qty = el("div", "qty");
-      var minus = el("button", null, "\u2212"); minus.type = "button"; minus.setAttribute("aria-label", "Decrease quantity of " + it.name);
-      var out = el("output", null, String(it.qty));
-      var plus = el("button", null, "+"); plus.type = "button"; plus.setAttribute("aria-label", "Increase quantity of " + it.name);
-      minus.addEventListener("click", function () { if (it.qty > 1) { it.qty--; renderAll(); } });
-      plus.addEventListener("click", function () { if (it.qty < MAX_QTY) { it.qty++; renderAll(); } });
-      qty.appendChild(minus); qty.appendChild(out); qty.appendChild(plus);
-      var rm = el("button", "link-btn", "Remove"); rm.type = "button"; rm.setAttribute("aria-label", "Remove " + it.name);
-      rm.addEventListener("click", function () { state.items = state.items.filter(function (x) { return x !== it; }); renderAll(); });
-      actions.appendChild(qty); actions.appendChild(rm);
-      row.appendChild(actions);
-      box.appendChild(row);
+    // Category
+    var f1 = el("div", "field"); f1.appendChild(el("span", "lbl", "Category"));
+    var seg = el("div", "seg"); seg.setAttribute("role", "group"); seg.setAttribute("aria-label", "Category");
+    [["club", "Football Club"], ["country", "National Team"]].forEach(function (p) {
+      var b = el("button", null, p[1]); b.type = "button"; b.setAttribute("aria-pressed", l.cat === p[0] ? "true" : "false");
+      b.addEventListener("click", function () { if (l.cat === p[0]) return; l.cat = p[0]; l.team = ""; l.other = ""; renderLines(); refreshAll(); });
+      seg.appendChild(b);
     });
-    var t = totals();
-    $("cartEmpty").hidden = state.items.length > 0;
-    $("cartTotals").hidden = state.items.length === 0;
-    $("cQty").textContent = String(t.qty);
-    $("cTotal").textContent = A.naira(t.amount);
-    $("tbQty").textContent = t.qty + (t.qty === 1 ? " jersey" : " jerseys");
-    $("tbTotal").textContent = A.naira(t.amount);
-  }
+    f1.appendChild(seg); box.appendChild(f1);
 
-  // ---------- Customer details (validated again on the server later) ----------
+    // Team
+    var f2 = el("div", "field");
+    var lt = el("label", "lbl", l.cat === "club" ? "Club" : "National team"); lt.htmlFor = "team" + l.id; f2.appendChild(lt);
+    var sel = el("select", "input"); sel.id = "team" + l.id;
+    var ph = el("option", null, l.cat === "club" ? "Choose a club" : "Choose a national team"); ph.value = ""; sel.appendChild(ph);
+    LISTS[l.cat].forEach(function (n) { var op = el("option", null, n); op.value = n; if (l.team === n) op.selected = true; sel.appendChild(op); });
+    f2.appendChild(sel); box.appendChild(f2);
+
+    var fo = el("div", "field"); fo.hidden = l.team !== OTHER[l.cat];
+    var oi = el("input", "input"); oi.maxLength = 60; oi.value = l.other; oi.autocomplete = "off";
+    oi.placeholder = l.cat === "club" ? "Type the club name" : "Type the country name"; oi.setAttribute("aria-label", l.cat === "club" ? "Club name" : "Country name");
+    fo.appendChild(oi); box.appendChild(fo);
+    sel.addEventListener("change", function () { l.team = sel.value; fo.hidden = l.team !== OTHER[l.cat]; if (!fo.hidden) oi.focus(); l.refresh(); refreshAll(); });
+    oi.addEventListener("input", function () { l.other = oi.value; l.refresh(); refreshAll(); });
+
+    // Version
+    var f3 = el("div", "field"); f3.appendChild(el("span", "lbl", "Version"));
+    var vseg = el("div", "seg"); vseg.setAttribute("role", "group"); vseg.setAttribute("aria-label", "Jersey version");
+    var vbtns = [];
+    VERSIONS.forEach(function (v) {
+      var b = el("button", null, v); b.type = "button"; b.setAttribute("aria-pressed", l.ver === v ? "true" : "false");
+      b.addEventListener("click", function () { l.ver = v; vbtns.forEach(function (x) { x.setAttribute("aria-pressed", x.textContent === v ? "true" : "false"); }); l.refresh(); refreshAll(); });
+      vbtns.push(b); vseg.appendChild(b);
+    });
+    f3.appendChild(vseg); box.appendChild(f3);
+
+    // Size
+    var f4 = el("div", "field"); f4.appendChild(el("span", "lbl", "Size"));
+    var chips = el("div", "chips"); chips.setAttribute("role", "group"); chips.setAttribute("aria-label", "Size");
+    var sbtns = [];
+    SIZES.forEach(function (s) {
+      var b = el("button", "size-chip", s); b.type = "button"; b.setAttribute("aria-pressed", l.size === s ? "true" : "false");
+      b.addEventListener("click", function () { l.size = s; sbtns.forEach(function (x) { x.setAttribute("aria-pressed", x.textContent === s ? "true" : "false"); }); l.refresh(); refreshAll(); });
+      sbtns.push(b); chips.appendChild(b);
+    });
+    f4.appendChild(chips); box.appendChild(f4);
+
+    // Quantity + price
+    var foot = el("div", "line-foot");
+    var qty = el("div", "qty");
+    var minus = el("button", null, "\u2212"); minus.type = "button"; minus.setAttribute("aria-label", "Decrease quantity");
+    var out = el("output", null, String(l.qty));
+    var plus = el("button", null, "+"); plus.type = "button"; plus.setAttribute("aria-label", "Increase quantity");
+    minus.addEventListener("click", function () { if (l.qty > 1) { l.qty--; out.textContent = l.qty; l.refresh(); refreshAll(); } });
+    plus.addEventListener("click", function () { if (l.qty < MAX_QTY) { l.qty++; out.textContent = l.qty; l.refresh(); refreshAll(); } });
+    qty.appendChild(minus); qty.appendChild(out); qty.appendChild(plus);
+    var price = el("span", "line-price");
+    foot.appendChild(qty); foot.appendChild(price); box.appendChild(foot);
+    var err = el("p", "err"); err.setAttribute("role", "alert"); box.appendChild(err);
+
+    l.refresh = function () {
+      var e = lineError(l);
+      price.textContent = e === "" ? A.naira(l.qty * PRICE) : "\u2014";
+      err.textContent = l.show ? e : "";
+      box.classList.toggle("has-error", !!(l.show && e));
+    };
+    l.refresh();
+    return box;
+  }
+  function renderLines() {
+    var box = $("lines"); box.textContent = "";
+    lines.forEach(function (l, i) { box.appendChild(buildLine(l, i)); });
+    $("addLine").disabled = lines.length >= MAX_LINES || A.isClosed();
+  }
+  $("addLine").addEventListener("click", function () {
+    if (lines.length >= MAX_LINES) return;
+    lines.push(newLine()); renderLines(); refreshAll();
+    var last = lines[lines.length - 1]; var s = $("team" + last.id); if (s) s.focus();
+  });
+
+  // ---------- Customer details (checked again on the server) ----------
   var NAME_RE = /^[\p{L}][\p{L}\s.'\u2019-]{2,79}$/u;
   var PHONE_RE = /^0[789][01]\d{8}$/;
   var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -169,17 +180,17 @@
     return ok;
   }
   Object.keys(checks).forEach(function (id) {
-    $(id).addEventListener("blur", function () { checkField(id, true); updateSubmit(); });
-    $(id).addEventListener("input", function () { if ($(id).getAttribute("aria-invalid")) checkField(id, true); renderSummary(); updateSubmit(); });
+    $(id).addEventListener("blur", function () { checkField(id, true); });
+    $(id).addEventListener("input", function () { if ($(id).getAttribute("aria-invalid")) checkField(id, true); renderSummary(); });
   });
 
   // ---------- Review ----------
   function block(title) { var b = el("div", "sum-block"); b.appendChild(el("h3", null, title)); return b; }
   function row(a, b) { var r = el("div", "sum-row"); r.appendChild(el("span", null, a)); r.appendChild(el("b", null, b)); return r; }
   function renderSummary() {
-    var box = $("summary");
-    box.textContent = "";
-    if (state.items.length === 0) { box.appendChild(el("p", "empty", "Add at least one jersey to see your summary.")); return; }
+    var box = $("summary"); box.textContent = "";
+    var items = mergedItems(true), t = totals();
+    if (items.length === 0) { box.appendChild(el("p", "empty", "Choose a jersey above to see your summary.")); return; }
     var cust = block("Customer");
     cust.appendChild(row("Name", $("fName").value.trim() || "-"));
     cust.appendChild(row("Phone", normPhone($("fPhone").value) || "-"));
@@ -187,60 +198,71 @@
     if ($("fNotes").value.trim()) cust.appendChild(row("Notes", $("fNotes").value.trim()));
     box.appendChild(cust);
 
-    var items = block("Jerseys");
-    state.items.forEach(function (it) {
-      items.appendChild(row(it.name + " \u00B7 " + it.ver + " \u00B7 " + it.size + " \u00D7 " + it.qty, A.naira(it.qty * PRICE)));
-    });
-    box.appendChild(items);
+    var jb = block("Jerseys");
+    items.forEach(function (it) { jb.appendChild(row(it.name + " \u00B7 " + it.ver + " \u00B7 " + it.size + " \u00D7 " + it.qty, A.naira(it.qty * PRICE))); });
+    if (lines.some(function (l) { return !complete(l); })) jb.appendChild(el("p", "err", "Some jerseys are not complete yet and are not counted."));
+    box.appendChild(jb);
 
-    var t = totals();
     var sum = block("Totals");
     sum.appendChild(row("Unit price", A.naira(PRICE)));
     sum.appendChild(row("Total jerseys", String(t.qty)));
     sum.appendChild(row("Delivery date", C.DELIVERY_DATE || ""));
     sum.appendChild(row("Delivery", A.deliveryText));
     var tot = el("div", "sum-row"); tot.appendChild(el("span", null, "Total")); tot.appendChild(el("span", "sum-total", A.naira(t.amount)));
-    sum.appendChild(tot);
-    box.appendChild(sum);
+    sum.appendChild(tot); box.appendChild(sum);
   }
-
   function updateSubmit() {
-    $("submitBtn").disabled = !(state.items.length > 0 && detailsValid(false) && $("confirm").checked && !A.isClosed());
+    var ticked = $("confirm").checked;
+    $("submitBtn").disabled = !ticked || A.isClosed();
+    $("reviewHint").textContent = ticked ? "" : "Tick the box above, then confirm your order.";
+  }
+  function refreshAll() {
+    var t = totals();
+    $("cQty").textContent = String(t.qty); $("cTotal").textContent = A.naira(t.amount);
+    $("tbQty").textContent = t.qty + (t.qty === 1 ? " jersey" : " jerseys"); $("tbTotal").textContent = A.naira(t.amount);
+    renderSummary(); updateSubmit(); save();
   }
   $("confirm").addEventListener("change", updateSubmit);
 
   $("submitBtn").addEventListener("click", function () {
-    var msg = $("submitMsg");
-    msg.hidden = true;
+    var msg = $("submitMsg"); msg.hidden = true;
     if (A.isClosed()) { msg.textContent = "Orders are closed."; msg.hidden = false; return; }
-    if (state.items.length === 0) { msg.textContent = "Add at least one jersey first."; msg.hidden = false; return; }
-    if (!detailsValid(true)) { var bad = ["fName", "fPhone", "fEmail", "fNotes"].filter(function (id) { return !checkField(id, false); })[0]; if (bad) $(bad).focus(); return; }
-
-    // Prices are NOT sent: the server will calculate them (Phase 8).
+    lines.forEach(function (l) { l.show = true; if (l.refresh) l.refresh(); });
+    if (lines.length === 0 || lines.some(function (l) { return !complete(l); })) {
+      var bad = document.querySelector(".line.has-error");
+      if (bad) bad.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    if (!detailsValid(true)) {
+      var first = ["fName", "fPhone", "fEmail", "fNotes"].filter(function (id) { return !checkField(id, false); })[0];
+      if (first) $(first).focus();
+      return;
+    }
+    var items = mergedItems(false);
+    if (items.some(function (i) { return i.qty > MAX_QTY; })) {
+      msg.textContent = "Maximum " + MAX_QTY + " of the same jersey (same team, version and size) per order."; msg.hidden = false; return;
+    }
+    // Prices are NOT sent: the server calculates them.
     var payload = {
       customer_name: $("fName").value.trim().replace(/\s+/g, " "),
       customer_phone: normPhone($("fPhone").value),
       customer_email: $("fEmail").value.trim() || null,
       notes: $("fNotes").value.trim() || null,
-      items: state.items.map(function (i) { return { category: i.cat === "club" ? "Football Club" : "National Team", club_or_country: i.name, jersey_version: i.ver, size: i.size, quantity: i.qty }; })
+      items: items.map(function (i) { return { category: i.cat === "club" ? "Football Club" : "National Team", club_or_country: i.name, jersey_version: i.ver, size: i.size, quantity: i.qty }; })
     };
-
     if (typeof window.AKL_submitOrder === "function") { window.AKL_submitOrder(payload); return; }
-    msg.textContent = "Your order is ready, but saving orders is not connected yet (database comes next). Nothing has been saved or sent.";
-    msg.hidden = false;
+    msg.textContent = "Saving orders is not connected."; msg.hidden = false;
   });
 
   // ---------- Start ----------
-  function renderAll() { saveCart(); renderCart(); renderSummary(); updateSubmit(); }
-
-  state.items = loadCart();
-  var qs = new URLSearchParams(location.search);
-  var qType = qs.get("type"), qName = qs.get("name");
-  if (qType === "club" || qType === "country") {
-    state.cat = qType; syncSeg("catSeg", qType);
-    if (qName === "other") state.team = OTHER[qType];
-    else if (LISTS[qType].indexOf(qName) !== -1) state.team = qName;
+  lines = load();
+  if (lines.length === 0) lines = [newLine()];
+  var qs = new URLSearchParams(location.search), qType = qs.get("type"), qName = qs.get("name");
+  if ((qType === "club" || qType === "country") && !lines[0].team) {
+    lines[0].cat = qType;
+    if (qName === "other") lines[0].team = OTHER[qType];
+    else if (LISTS[qType].indexOf(qName) !== -1) lines[0].team = qName;
   }
-  renderTeams(); renderSizes(); refreshOther(); refreshAddBtn(); renderAll();
-  if (A.isClosed()) { $("closedNote").hidden = false; $("addBtn").disabled = true; }
+  renderLines(); refreshAll();
+  if (A.isClosed()) { $("closedNote").hidden = false; $("addLine").disabled = true; }
 })();
